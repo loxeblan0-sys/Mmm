@@ -173,41 +173,18 @@ def create_vnc_session(chat_id, url, proxy_str=None):
         log.info(f"Sandbox создан: {sandbox.id} для chat_id={chat_id}")
         active_sessions[chat_id] = sandbox.id
 
+        # Ждём пока sandbox полностью стартует (Xvfb, x11vnc, noVNC уже запущены через start.sh)
         bot.send_message(chat_id, "🖥 Запускаю браузер...")
+        import time as _time
+        _time.sleep(5)  # Даём время start.sh отработать
 
-        startup_script = f"""#!/bin/bash
-export DISPLAY=:1
+        # Запускаем Firefox через bash -c (Xvfb/VNC/noVNC уже запущены в образе)
+        firefox_cmd = f'DISPLAY=:1 nohup firefox-esr --kiosk "{url}" --no-sandbox >/tmp/firefox.log 2>&1 &'
+        result = sandbox.process.exec(f'bash -c "{firefox_cmd}"', timeout=30)
+        log.info(f"Firefox launch result: {result.result}")
 
-# Убиваем старые процессы
-pkill -f Xvfb 2>/dev/null || true
-pkill -f x11vnc 2>/dev/null || true
-pkill -f novnc_proxy 2>/dev/null || true
-pkill -f firefox 2>/dev/null || true
-sleep 1
-
-# Виртуальный экран
-Xvfb :1 -screen 0 1280x800x24 &>/tmp/xvfb.log &
-sleep 2
-
-# VNC сервер
-x11vnc -display :1 -nopw -listen 0.0.0.0 -rfbport 5900 -forever -shared -bg -o /tmp/x11vnc.log
-sleep 1
-
-# noVNC (порт 6080)
-nohup /usr/share/novnc/utils/novnc_proxy --vnc localhost:5900 --listen 6080 &>/tmp/novnc.log &
-sleep 2
-
-# Убиваем лишние панели
-pkill -f xfce4-panel 2>/dev/null || true
-pkill -f xfdesktop 2>/dev/null || true
-
-# Firefox в kiosk-режиме
-nohup firefox-esr --display=:1 --kiosk "{url}" --no-sandbox &>/tmp/firefox.log &
-echo "STARTED"
-"""
-
-        result = sandbox.process.exec(startup_script, timeout=60)
-        log.info(f"Startup result: {result.result}")
+        # Ждём запуска Firefox
+        _time.sleep(5)
 
         # Получаем VNC-ссылку
         vnc_url = sandbox.get_preview_url(6080)
