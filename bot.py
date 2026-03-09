@@ -237,8 +237,32 @@ echo "STARTED"
         threading.Thread(target=delete_later, daemon=True).start()
 
     except Exception as e:
-        log.error(f"Ошибка создания sandbox: {e}")
-        bot.send_message(chat_id, f"❌ Ошибка при создании сессии:\n<code>{e}</code>")
+        err = str(e)
+        log.error(f"Ошибка создания sandbox: {err}")
+        # Если превышен лимит диска — автоматически чистим старые sandbox
+        if "disk limit" in err.lower() or "Total disk limit" in err:
+            bot.send_message(chat_id, "⚠️ Лимит диска исчерпан. Автоматически удаляю старые сессии...")
+            try:
+                sandboxes = daytona.list()
+                deleted = 0
+                for sb in sandboxes:
+                    try:
+                        sb.delete()
+                        deleted += 1
+                    except Exception:
+                        pass
+                if deleted > 0:
+                    bot.send_message(chat_id, f"🗑 Удалено {deleted} старых сессий. Пробую снова...")
+                    time.sleep(3)
+                    create_vnc_session(chat_id, url, proxy_str)
+                    return
+                else:
+                    bot.send_message(chat_id, "❌ Не удалось освободить место. Зайди на app.daytona.io и удали старые sandbox вручную.")
+            except Exception as ce:
+                log.error(f"Ошибка при очистке: {ce}")
+                bot.send_message(chat_id, "❌ Лимит диска исчерпан. Зайди на app.daytona.io → Sandboxes и удали старые сессии.")
+        else:
+            bot.send_message(chat_id, f"❌ Ошибка при создании сессии:\n<code>{err}</code>")
 
 # ─────────────────────────────────────────────
 #  ОБРАБОТЧИКИ КОМАНД
