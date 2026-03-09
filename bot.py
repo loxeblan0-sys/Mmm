@@ -186,9 +186,10 @@ def create_vnc_session(chat_id, url, proxy_str=None):
         # Ждём запуска Firefox
         _time.sleep(5)
 
-        # Получаем VNC-ссылку
-        vnc_url = sandbox.get_preview_url(6080)
-        vnc_lite = f"{vnc_url}/vnc_lite.html?autoconnect=1&reconnect=1"
+        # Получаем VNC-ссылку (подписанная, действует 7 минут = 420 сек)
+        signed = sandbox.create_signed_preview_url(6080, expires_in_seconds=420)
+        vnc_base = signed.url  # https://6080-TOKEN.daytonaproxy01.net
+        vnc_lite = f"{vnc_base}/vnc_lite.html?autoconnect=1&reconnect=1"
 
         proxy_line = f"\n🌐 <b>Прокси:</b> <code>{proxy_str}</code>" if proxy_str else ""
         msg = (
