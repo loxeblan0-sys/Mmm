@@ -179,8 +179,24 @@ def create_vnc_session(chat_id, url, proxy_str=None):
         _time.sleep(5)  # Даём время start.sh отработать
 
         # Запускаем Firefox через bash -c (Xvfb/VNC/noVNC уже запущены в образе)
-        firefox_cmd = f'DISPLAY=:1 nohup firefox-esr --kiosk "{url}" --no-sandbox >/tmp/firefox.log 2>&1 &'
-        result = sandbox.process.exec(f'bash -c "{firefox_cmd}"', timeout=30)
+        # Убиваем старый Firefox если был
+        try:
+            sandbox.process.exec('bash -c "pkill -f firefox 2>/dev/null; sleep 1"', timeout=5)
+        except Exception:
+            pass
+
+        # Запускаем Firefox с флагами для headless окружения без GPU
+        firefox_cmd = (
+            f'DISPLAY=:1 MOZ_DISABLE_RDD_SANDBOX=1 '
+            f'nohup firefox-esr '
+            f'--kiosk "{url}" '
+            f'--no-sandbox '
+            f'--disable-gpu '
+            f'--disable-dev-shm-usage '
+            f'--ignore-certificate-errors '
+            f'>/tmp/firefox.log 2>&1 &'
+        )
+        result = sandbox.process.exec(f'bash -c \'{firefox_cmd}\'', timeout=30)
         log.info(f"Firefox launch result: {result.result}")
 
         # Ждём запуска Firefox
